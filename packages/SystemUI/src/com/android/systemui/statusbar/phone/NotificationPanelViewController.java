@@ -204,6 +204,8 @@ import com.android.systemui.util.time.SystemClock;
 import com.android.systemui.wallet.controller.QuickAccessWalletController;
 import com.android.wm.shell.animation.FlingAnimationUtils;
 
+import com.android.internal.util.superior.SuperiorUtils;
+
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -361,6 +363,9 @@ public class NotificationPanelViewController extends PanelViewController {
     private int mTrackingPointer;
     private VelocityTracker mQsVelocityTracker;
     private boolean mQsTracking;
+
+    private GestureDetector mLockscreenDoubleTapToSleep;
+    private boolean mIsLockscreenDoubleTapEnabled;
 
     /**
      * If set, the ongoing touch gesture might both trigger the expansion in {@link PanelView} and
@@ -920,6 +925,16 @@ public class NotificationPanelViewController extends PanelViewController {
 
         mQsFrameTranslateController = qsFrameTranslateController;
         updateUserSwitcherFlags();
+
+        mLockscreenDoubleTapToSleep = new GestureDetector(context,
+                new GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public boolean onDoubleTap(MotionEvent e) {
+                SuperiorUtils.switchScreenOff(context);
+                return true;
+            }
+        });
+
         onFinishInflate();
         mUseCombinedQSHeaders = featureFlags.isEnabled(Flags.COMBINED_QS_HEADERS);
         keyguardUnlockAnimationController.addKeyguardUnlockAnimationListener(
@@ -4102,6 +4117,10 @@ public class NotificationPanelViewController extends PanelViewController {
         updateMaxDisplayedNotifications(true);
     }
 
+    public void setLockscreenDoubleTapToSleep(boolean isDoubleTapEnabled) {
+        mIsLockscreenDoubleTapEnabled = isDoubleTapEnabled
+    }
+
     public void setAlpha(float alpha) {
         mView.setAlpha(alpha);
     }
@@ -4247,6 +4266,12 @@ public class NotificationPanelViewController extends PanelViewController {
                 if (mLastEventSynthesizedDown && event.getAction() == MotionEvent.ACTION_UP) {
                     expand(true /* animate */);
                 }
+
+                if (mIsLockscreenDoubleTapEnabled && !mPulsing && !mDozing
+                        && mStatusBarState == StatusBarState.KEYGUARD) {
+                    mLockscreenDoubleTapToSleep.onTouchEvent(event);
+                }
+
                 initDownStates(event);
 
                 // If pulse is expanding already, let's give it the touch. There are situations

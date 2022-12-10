@@ -376,21 +376,10 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
                         // Don't do anything
                         return;
                     }
-                    final SystemUIDialog killDialog = new SystemUIDialog(mContext);
-                    killDialog.setTitle(mContext.getText(R.string.force_stop_dlg_title));
-                    killDialog.setMessage(mContext.getText(R.string.force_stop_dlg_text));
-                    killDialog.setPositiveButton(
-                            R.string.dlg_ok, new DialogInterface.OnClickListener() {
-                        public void onClick(DialogInterface dialog, int which) {
-                            // kill pkg
-                            ActivityManager actMan =
-                                    (ActivityManager) mContext.getSystemService(
-                                    Context.ACTIVITY_SERVICE);
-                            actMan.forceStopPackage(mPackageName);
-                        }
-                    });
-                    killDialog.setNegativeButton(R.string.dlg_cancel, null);
-                    killDialog.show();
+                    ActivityManager actMan =
+			(ActivityManager) mContext.getSystemService(
+	                Context.ACTIVITY_SERVICE);
+                    actMan.forceStopPackage(mPackageName);
                 }
             });
         } else {

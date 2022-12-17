@@ -67,9 +67,12 @@ import com.android.server.health.HealthServiceWrapper;
 import com.android.server.lights.LightsManager;
 import com.android.server.lights.LogicalLight;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileDescriptor;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayDeque;
@@ -164,6 +167,10 @@ public final class BatteryService extends SystemService {
     private int mLastPlugType = -1; // Extra state so we can detect first run
 
     private boolean mBatteryLevelLow;
+
+    private boolean mOemFastCharger;
+    private boolean mHasOemFastCharger;
+    private boolean mLastOemFastCharger;
 
     private long mDischargeStartTime;
     private int mDischargeStartLevel;
@@ -531,6 +538,8 @@ public final class BatteryService extends SystemService {
         shutdownIfNoPowerLocked();
         shutdownIfOverTempLocked();
 
+	mOemFastCharger = isOemFastCharger();
+
         if (force
                 || (mHealthInfo.batteryStatus != mLastBatteryStatus
                         || mHealthInfo.batteryHealth != mLastBatteryHealth
@@ -542,7 +551,8 @@ public final class BatteryService extends SystemService {
                         || mHealthInfo.maxChargingCurrentMicroamps != mLastMaxChargingCurrent
                         || mHealthInfo.maxChargingVoltageMicrovolts != mLastMaxChargingVoltage
                         || mHealthInfo.batteryChargeCounterUah != mLastChargeCounter
-                        || mInvalidCharger != mLastInvalidCharger)) {
+                        || mInvalidCharger != mLastInvalidCharger
+			|| mOemFastCharger != mLastOemFastCharger)) {
 
             if (mPlugType != mLastPlugType) {
                 if (mLastPlugType == BATTERY_PLUGGED_NONE) {
@@ -716,6 +726,7 @@ public final class BatteryService extends SystemService {
             mLastChargeCounter = mHealthInfo.batteryChargeCounterUah;
             mLastBatteryLevelCritical = mBatteryLevelCritical;
             mLastInvalidCharger = mInvalidCharger;
+            mLastOemFastCharger = mOemFastCharger;
         }
     }
 
@@ -747,6 +758,7 @@ public final class BatteryService extends SystemService {
                 BatteryManager.EXTRA_MAX_CHARGING_VOLTAGE,
                 mHealthInfo.maxChargingVoltageMicrovolts);
         intent.putExtra(BatteryManager.EXTRA_CHARGE_COUNTER, mHealthInfo.batteryChargeCounterUah);
+	intent.putExtra(BatteryManager.EXTRA_OEM_FAST_CHARGER, mOemFastCharger);
         if (DEBUG) {
             Slog.d(TAG, "Sending ACTION_BATTERY_CHANGED. scale:" + BATTERY_SCALE
                     + ", info:" + mHealthInfo.toString());
@@ -799,6 +811,23 @@ public final class BatteryService extends SystemService {
         mContext.sendBroadcastAsUser(intent, UserHandle.ALL,
                 android.Manifest.permission.BATTERY_STATS);
         mLastBatteryLevelChangedSentMs = SystemClock.elapsedRealtime();
+    }
+
+    private boolean isOemFastCharger() {
+        String filePath = mContext.getResources().getString(
+                com.android.internal.R.string.config_oemFastChargeNodePath);
+        if (filePath == null || filePath.isEmpty()) return false;
+        try {
+            FileReader file = new FileReader(filePath);
+            BufferedReader br = new BufferedReader(file);
+            String state = br.readLine();
+            br.close();
+            file.close();
+            return "1".equals(state);
+        } catch (FileNotFoundException e) {
+        } catch (IOException e) {
+        }
+        return false;
     }
 
     // TODO: Current code doesn't work since "--unplugged" flag in BSS was purposefully removed.
